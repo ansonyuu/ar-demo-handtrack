@@ -32,7 +32,6 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
   const countdownUI = (await Scene.root.findFirst("Countdown")) as PlanarText;
 
   const textMaterial = await Materials.findFirst("MaterialText");
-  const trackerMaterial = await Materials.findFirst("MaterialHandTracked");
 
   // Get hand tracked object
   const handTarget1 = await Scene.root.findFirst("handTarget1");
