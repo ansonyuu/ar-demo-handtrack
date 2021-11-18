@@ -6,31 +6,35 @@ import Animation from "Animation";
 import Random from "Random";
 import Materials from "Materials";
 
-// https://github.com/RokkoEffe/Creating-2D-3D-colliders-with-Scripting-Spark-AR/blob/main/README.md
+// Helper function for checking collisions, based on https://github.com/RokkoEffe/Creating-2D-3D-colliders-with-Scripting-Spark-AR/blob/main/README.md
 function checkCollision(positionA, positionB, lengthA, lengthB) {
   return Reactive.abs(positionA.sub(positionB)).le(
     Reactive.add(lengthA.div(2), lengthB.div(2))
   );
 }
 
+// Main event
 (async function () {
   // Init game
   let score = 0;
+  let bestScore = 0;
   let activeTargetIndex = null;
   const screenSize = await Patches.outputs.getPoint2D("deviceSize");
-  const { driver, animation } = createTimer();
 
+  //TODO: reset drivers
+  const { driver, animation } = createTimer();
   const { countdownDriver, countdownAnimation } = createCountdown();
 
   const targetParent = await Scene.root.findFirst("Targets");
   const targets = await createTargets();
 
-  // Get UI Elements
+  // Get UI elements
   const startButton = await Scene.root.findFirst("Start Button");
   const timerUI = (await Scene.root.findFirst("Timer")) as PlanarText;
   const scoreUI = (await Scene.root.findFirst("Score")) as PlanarText;
   const countdownUI = (await Scene.root.findFirst("Countdown")) as PlanarText;
 
+  // Get text materials
   const textMaterial = await Materials.findFirst("MaterialText");
 
   // Get hand tracked object
@@ -39,30 +43,35 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
 
   // Start game
   const startPulse = await Patches.outputs.getPulse("startGame");
-  startPulse.subscribe(() => {
-    countdownUI.hidden = Reactive.val(false);
-    let timeText = 3;
 
-    // We don't technically have to use text here - this could be a texture
-    // index of a sprite sheet or the index of which 3D Text number should be
-    // visible.
-    countdownUI.text = Reactive.val(timeText.toString());
+  function reset() {
+    startPulse.subscribe(() => {
+      countdownUI.hidden = Reactive.val(false);
+      let timeText = 3;
 
-    countdownUI.transform.y = countdownAnimation
-      .mul(-30)
-      .add(screenSize.x.div(2).sub(countdownUI.height.div(2)));
-    textMaterial.opacity = countdownAnimation;
+      // We don't technically have to use text here - this could be a texture
+      // index of a sprite sheet or the index of which 3D Text number should be
+      // visible.
+      countdownUI.text = Reactive.val(timeText.toString());
 
-    countdownDriver.start();
-    countdownDriver.onAfterIteration().subscribe((i) => {
-      countdownUI.text = Reactive.val((timeText - i).toString());
+      countdownUI.transform.y = countdownAnimation
+        .mul(-30)
+        .add(screenSize.x.div(2).sub(countdownUI.height.div(2)));
+      textMaterial.opacity = countdownAnimation;
+
+      countdownDriver.start();
+      countdownDriver.onAfterIteration().subscribe((i) => {
+        countdownUI.text = Reactive.val((timeText - i).toString());
+      });
+
+      countdownDriver.onCompleted().subscribe(() => {
+        countdownUI.hidden = Reactive.val(true);
+        startGame();
+      });
     });
+  }
 
-    countdownDriver.onCompleted().subscribe(() => {
-      countdownUI.hidden = Reactive.val(true);
-      startGame();
-    });
-  });
+  reset();
 
   function startGame() {
     targetParent.hidden = Reactive.val(false);
@@ -78,21 +87,20 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
       timerUI.text = Reactive.val(`${time.newValue.toFixed(2)}`);
     });
 
-    // When timer finished, unsubscribe from animation and call our game over
-    // function to handle cleanup
-    driver.onCompleted().subscribe(() => {
-      timerSubscription.unsubscribe();
-      Diagnostics.log("donezo");
-
-      gameOver();
-    });
-
     // Initialize first target
     getRandomTarget();
 
     // Calls game loop with actual game logic
     gameLoop();
   }
+
+  // When timer finished, unsubscribe from animation and call our game over
+  // function to handle cleanup
+  driver.onCompleted().subscribe(() => {
+    timerSubscription.unsubscribe();
+    Diagnostics.log("donezo");
+    gameOver();
+  });
 
   /**
    * Sets new random target out of available targets. If there is currently a
@@ -197,11 +205,25 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
     timerUI.hidden = Reactive.val(true);
     targetParent.hidden = Reactive.val(true);
 
+    score > bestScore ? (bestScore = score) : null;
+    scoreUI.text = Reactive.val(
+      "Your current score is " +
+        score.toString() +
+        "Your best score is " +
+        bestScore.toString()
+    );
+
     // Unsubscribe our collision subscriptions if game is no longer running
     targets.forEach((target) => {
       target.collisionSubscription1.unsubscribe();
       target.collisionSubscription2.unsubscribe();
     });
+
+    scoreUI.hidden = Reactive.val(false);
+    startButton.hidden = Reactive.val(false);
+    driver.reset();
+    countdownDriver.reset();
+    reset();
   }
 
   /**
@@ -260,7 +282,7 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
     animation: ScalarSignal;
   } {
     const timeDriverParameters = {
-      durationMilliseconds: 20000
+      durationMilliseconds: 2000
     };
 
     // The driver controls time, can be started, stopped
