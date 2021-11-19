@@ -26,8 +26,6 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
   const { countdownDriver, countdownAnimation } = createCountdown();
 
   const targetParent = await Scene.root.findFirst("Targets");
-  const targets = await createTargets();
-
   // Get UI elements
   const startButton = await Scene.root.findFirst("Start Button");
   const timerUI = (await Scene.root.findFirst("Timer")) as PlanarText;
@@ -223,52 +221,6 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
     driver.reset();
     countdownDriver.reset();
     reset();
-  }
-
-  /**
-   * Fetches our targets and returns object with each target and an associated
-   * collisionSubscription.
-   *
-   * @returns [{target: SceneObjectBase, collisionSubscription: null}]
-   */
-  async function createTargets() {
-    // Gets the screen corners in world space so we can correctly position our
-    // targets
-    const corners = [
-      Scene.unprojectToFocalPlane(Reactive.point2d(0, 0)),
-      Scene.unprojectToFocalPlane(Reactive.point2d(screenSize.x, 0)),
-      Scene.unprojectToFocalPlane(Reactive.point2d(screenSize.x, screenSize.y)),
-      Scene.unprojectToFocalPlane(Reactive.point2d(0, screenSize.y))
-    ];
-
-    // Set up the targets we want to get
-    const targetsToFind: Array<Promise<SceneObjectBase>> = [];
-    for (let i = 1; i <= 4; i++) {
-      targetsToFind.push(targetParent.findFirst(`static-${i}`));
-    }
-
-    // Get our targets
-    const targets = await Promise.all(targetsToFind);
-
-    return targets.map((target, index) => {
-      // Position based on screen corners. Z wasn't 0 for some reason so we have
-      // to force that... We will most likely want to offset these as it is
-      // centered around the object origin, aka the objects are half off the
-      // screen. Possible we could have the targets positioned here, but have a
-      // child object that is actually what's displayed? Bascially use a null
-      // object and then have something else with an offset local position.
-      target.transform.position = Reactive.point(
-        corners[index].x,
-        corners[index].y,
-        0
-      );
-      return {
-        originalIndex: index, // Just so we can keep track of object when filtering
-        target,
-        collisionSubscription1: null,
-        collisionSubscription2: null
-      };
-    });
   }
 
   /**

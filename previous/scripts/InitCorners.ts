@@ -32,6 +32,7 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
   const startButton = await Scene.root.findFirst("Start Button");
   const timerUI = (await Scene.root.findFirst("Timer")) as PlanarText;
   const scoreUI = (await Scene.root.findFirst("Score")) as PlanarText;
+  const liveScoreUI = (await Scene.root.findFirst("liveScore")) as PlanarText;
   const countdownUI = (await Scene.root.findFirst("Countdown")) as PlanarText;
 
   // Get text materials
@@ -47,6 +48,7 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
   function reset() {
     startPulse.subscribe(() => {
       countdownUI.hidden = Reactive.val(false);
+      Diagnostics.log("startpulse working");
       let timeText = 3;
 
       // We don't technically have to use text here - this could be a texture
@@ -78,14 +80,23 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
     startButton.hidden = Reactive.val(true);
     timerUI.hidden = Reactive.val(false);
     scoreUI.hidden = Reactive.val(false);
-
     // Start timer
     driver.start();
-
     // Monitor timer and set text value to remaining play time
     const timerSubscription = animation.monitor().subscribe((time) => {
       timerUI.text = Reactive.val(`${time.newValue.toFixed(2)}`);
     });
+
+    // When timer finished, unsubscribe from animation and call our game over
+    // function to handle cleanup
+    driver.onCompleted().subscribe(() => {
+      timerSubscription.unsubscribe();
+      Diagnostics.log("donezo");
+
+      gameOver();
+    });
+
+    Diagnostics.log("startGame working");
 
     // Initialize first target
     getRandomTarget();
@@ -93,15 +104,11 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
     // Calls game loop with actual game logic
     gameLoop();
   }
-
-  // When timer finished, unsubscribe from animation and call our game over
-  // function to handle cleanup
-  driver.onCompleted().subscribe(() => {
-    timerSubscription.unsubscribe();
-    Diagnostics.log("donezo");
-    gameOver();
-  });
-
+  /**
+   * Sets new random target out of available targets. If there is currently a
+   * target set, will pick out of the other available ones then sets new active
+   * index.
+   */
   /**
    * Sets new random target out of available targets. If there is currently a
    * target set, will pick out of the other available ones then sets new active
@@ -112,14 +119,12 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
     const nextOptions = targets.filter(
       (el, index) => index !== activeTargetIndex
     );
-
     // Get random item out of the remaining items
     const randomIndex = Math.floor(Random.random() * nextOptions.length);
     const activeTarget = nextOptions[randomIndex];
-
     // Set active target to have some sort of visible difference
-    activeTarget.target.transform.scale = Reactive.point(1.5, 1.5, 1.0);
 
+    activeTarget.target.transform.scale = Reactive.point(3, 3, 3);
     // Update active index
     activeTargetIndex = activeTarget.originalIndex;
   }
@@ -193,6 +198,7 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
     // Update score
     score++;
     scoreUI.text = Reactive.val(score.toString());
+    liveScoreUI.text = Reactive.val(score.toString());
 
     // after score updated, randomize which target can be targetted next
     getRandomTarget();
@@ -282,7 +288,7 @@ function checkCollision(positionA, positionB, lengthA, lengthB) {
     animation: ScalarSignal;
   } {
     const timeDriverParameters = {
-      durationMilliseconds: 2000
+      durationMilliseconds: 10000
     };
 
     // The driver controls time, can be started, stopped
